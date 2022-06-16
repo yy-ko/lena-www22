@@ -9,3 +9,4 @@ ignore_dotfiles 1
 auto_sync_up    1
 remote_or_local remote
 sleep_before_sync 0
+
