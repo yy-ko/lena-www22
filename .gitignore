@@ -5,5 +5,4 @@ nohup.out
 *.sh
 *.log
 *.swp
-.gitignire
-.vim-arsync
+.*
