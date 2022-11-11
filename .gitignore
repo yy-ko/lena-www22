@@ -1,5 +1,7 @@
 __pycache__
 __pycache__/*
+log
+log/*
 __init__.py
 *.pyc
 nohup.out

@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import argparse
 import random, os, sys
 import numpy as np
@@ -11,12 +9,11 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.distributed as dist
+import torchvision.models as models
+
 from torch.optim.lr_scheduler import StepLR
 
-#  from torchsummary import summary
-
-# Implemented python files
-import dataloaders, models, utils
+import dataloaders, utils, lr_scaling
 
 
 warnings.simplefilter("ignore", UserWarning)
@@ -45,8 +42,6 @@ def evaluate(model, device, test_loader):
             #  predictions = outputs.argmax(dim=1, keepdim=True)  
             #  correct += predictions.eq(labels.view_as(predictions)).sum().item()
 
-    #  test_accuracy = correct / len(test_loader.dataset)
-
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).double().sum().item()
@@ -57,8 +52,16 @@ def evaluate(model, device, test_loader):
 
 
 
-
-
+def get_model(model_name, pretrained=False):
+    if model_name == 'RESNET18':
+        return models.resnet18(pretrained=pretrained) 
+    elif model_name == 'RESNET50':
+        return models.resnet50(pretrained=pretrained) 
+    else:
+        raise ValueError('Wrong model name!')
+    # you can define a new model and call it here
+    #  elif model_name == 'custom': 
+        #  return UserDefinedModel()
 
 
 def main():
@@ -81,7 +84,6 @@ def main():
     parser.add_argument("--warmup_ratio", type=float, default=5, help="Percentage of warmup ratio")
 
     parser.add_argument('--seed', type=int, default=1, metavar='S', help='Random seed (default: 1)')
-    #  parser.add_argument('--log_interval', type=int, default=100, metavar='N', help='How many batches to wait before logging training status')
 
     parser.add_argument('--save_model', action='store_true', default=False, help='For Saving the current Model')
     parser.add_argument('--model_dir', type=str, default='../trained_models', help='Path for saving the trained model')
@@ -94,7 +96,6 @@ def main():
     world_size = dist.get_world_size()
     local_rank = args.local_rank
     global_rank = dist.get_rank()
-    # Set random seeds for reproducibility
     set_random_seeds(args.seed)
 
 
@@ -114,7 +115,6 @@ def main():
         logging.info('      - PER WORKER ITERATION = ' + str(args.num_iterations))
         logging.info('  - NUM EPOCHS = ' + str(args.num_epochs))
         logging.info('  - BASE LEARNING RATE = ' + str(args.learning_rate))
-        #  warmup = 'No Warmup' if args.warmup == 0 else ( warmup == 'Fixed Warmup' if args.warmup == 1 else 'Train-Aware Warmup')
         warmup = { args.warmup == 0: 'No Warmup', args.warmup == 2: 'Train-Aware Warmup'}.get(True, 'Fixed Warmup')
         logging.info('  - LEARNING RATE WAMRUP (%d) = %s' % (args.warmup, str(warmup)))
         logging.info('  - WAMRUP PERIOD = %s' % (str(args.warmup_ratio)))
@@ -127,7 +127,7 @@ def main():
     # Encapsulate the model on the GPU assigned to the current process
     # Get the model and data loaders
     device = torch.device("cuda:{}".format(local_rank))
-    model = models.get_model(args.model)
+    model = get_model(args.model)
     model = model.to(device)
 
     train_loader, test_loader = dataloaders.get_dataset(args.dataset,
@@ -138,17 +138,6 @@ def main():
     # Define loss and optimizer
     criterion = nn.CrossEntropyLoss()
     optimizer = utils.get_optimizer(model, args)
-
-    # get a function for update with scaling/decaying learning rate
-    #  get_distributed_optimizer = utils.get_distributed_optimizer_fn(args.method,
-                                                    #  args.dataset,
-                                                    #  world_size,
-                                                    #  args.num_iterations,
-                                                    #  args.num_epochs,
-                                                    #  args.batch_size,
-                                                    #  args.learning_rate)
-
-    #  local_aggregate = utils.get_aggregate_fn(args.method, model_size)
 
 
     # ######################################################## #
@@ -173,7 +162,7 @@ def main():
     if global_rank == 0:
         logging.info('')
         logging.info('=============================== Training Start ===============================')
-        logging.info('\tepoch\tstep\ttrain\ttest\tloss\tthroughput\tlr\tgrad_var')
+        logging.info('\tEpoch\tStep\tTrain Acc.\tTest Acc.\tLoss\tImg/sec')
 
     for epoch in range(args.num_epochs):
 
@@ -205,19 +194,12 @@ def main():
                                                                 current_phase, meta_info)
 
             if current_phase == (args.num_iterations-1):
-                #  averaged_grads_list = utils.local_average_and_allreduce(model, local_grads_list, num_batches_per_update)
-                #  scaling_factor = utils.get_scaling_factor(args.method, num_batches_per_update, averaged_grads_list, meta_info)
-
                 utils.local_average_and_allreduce(model, local_grads_list, num_batches_per_update)
-                meta_info = utils.get_scaling_factor(args.method, num_batches_per_update, local_grads_list, meta_info)
+                meta_info = lr_scaling.get_scaling_factor(args.method, num_batches_per_update, local_grads_list, meta_info)
 
-                #  num_trained_batches = num_updates * num_batches_per_update
-                utils.set_learning_rate(args.dataset, optimizer, args.learning_rate, meta_info, total_steps, warmup_steps, decaying_steps, num_updates, num_batches_per_update, epoch+1, args.warmup)
-                #  utils.set_learning_rate(args.dataset, optimizer, args.learning_rate, scaling_factor, total_steps, warmup_steps, num_trained_batches, epoch+1)
-
-                #  optimizer = get_distributed_optimizer(model, local_grads_list, optimizer, num_updates, meta_info)
-                #  nn.utils.clip_grad_value_(model.parameters(), clip_value=0.1)
+                lr_scaling.set_learning_rate(args.dataset, optimizer, args.learning_rate, meta_info, total_steps, warmup_steps, decaying_steps, num_updates, num_batches_per_update, epoch+1, args.warmup)
                 optimizer.step()
+
                 num_updates += 1
                 local_grads_list = []
 
@@ -227,20 +209,6 @@ def main():
 
         # at each epoch, evaluate the test accuracy and log the progress
         if global_rank == 0:
-            #  print (meta_info['scaling_factor'])
-            #  scale_str = '{}\t'.format(epoch+1)
-            #  for scale in meta_info['scaling_factor']:
-                #  if scale.data > num_batches_per_update:
-                    #  scale_str += '{:.2f}\t'.format(num_batches_per_update)
-                #  else:
-                    #  scale_str += '{:.2f}\t'.format(scale.data)
-
-            #  scale_str += '{:.2f}\t'.format(meta_info['grad_var'])
-            #  logging.info(scale_str)
-
-            #  for i, (n, p) in enumerate(model.named_parameters()):
-                #  logging.info('layer {}: {}'.format(i, n))
-
             elapsed_time = time.time() - start_time
             train_accuracy = train_correct / len(train_loader.dataset) * world_size
 
@@ -248,41 +216,18 @@ def main():
             if test_accuracy > max_accuracy:
                 max_accuracy = test_accuracy
 
-            #  logging.info(len(train_loader.dataset))
             img_per_sec = len(train_loader.dataset) / elapsed_time
             current_lr = optimizer.param_groups[0]['lr']
 
-            logging.info('\t{}\t{}\t{:.4f}\t{:.4f}\t{:.4f}\t{:.2f}\t{:.4f}\t{:.2f}'.format(
+            logging.info('\t{}\t{}\t{:.4f}\t\t{:.4f}\t\t{:.4f}\t{:.2f}'.format(
                 (epoch+1),
                 num_updates,
                 train_accuracy,
                 test_accuracy,
                 loss.item(),
-                img_per_sec,
-                current_lr,
-                meta_info['grad_var'])
+                img_per_sec)
                 )
             start_time = time.time()
-
-
-
-            #####################
-            # model saving part #
-            #####################
-
-            #  if args.save_model:
-                #  torch.save(model.state_dict(), args.model_dir)
-
-            # check warm-up progress
-            #  count = 0
-            #  for i in meta_info['warmup_endpoint']:
-                #  if i == 0:
-                    #  break # keep training, still in warm-up
-                #  else:
-                    #  count += 1
-            #  if count == len(meta_info['warmup_endpoint']):
-                #  logging.info(meta_info['warmup_endpoint'])
-                #  break # warmup is done
 
 
     if global_rank == 0:
@@ -297,36 +242,4 @@ def main():
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     main()
-
-
-
-
-
-#  if global_rank == 0 and batch_idx % 100 == 0:
-    #  elapsed_time = time.time() - start_time
-    #  train_accuracy = train_correct / ((100*args.batch_size) * world_size)
-
-    #  #  test_accuracy = evaluate(model=model, device=device, test_loader=test_loader)
-    #  #  if test_accuracy > max_accuracy:
-        #  #  max_accuracy = test_accuracy
-
-    #  #  logging.info(len(train_loader.dataset))
-    #  img_per_sec = 100 * args.batch_size * world_size / elapsed_time
-    #  current_lr = optimizer.param_groups[0]['lr']
-
-    #  logging.info('\t{}\t{}\t{:.4f}\t{:.4f}\t{:.4f}\t{:.2f}\t{:.4f}'.format(
-        #  (epoch+1),
-        #  num_updates,
-        #  train_accuracy, 
-        #  0.0,
-        #  loss.item(),
-        #  img_per_sec,
-        #  current_lr)
-        #  )
-    #  start_time = time.time()
-
-    #  train_correct = 0
-
-
-
 
