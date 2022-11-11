@@ -36,7 +36,6 @@ Example:
 ## Citation
 Please cite our paper if you have used the code in your work. You can use the following BibTex citation:
 ```
-
 @inproceedings{ko2022not,
   title={Not All Layers Are Equal: A Layer-Wise Adaptive Approach Toward Large-Scale DNN Training},
   author={Ko, Yunyong and Lee, Dongwon and Kim, Sang-Wook},
