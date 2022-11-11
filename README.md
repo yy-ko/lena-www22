@@ -1,5 +1,4 @@
 # Not All Layers Are Equal: A Layer-Wise Adaptive Approach toward Large-Scale DNN Training
-
 This repository provides an implementation of *LENA* as described in the following paper:
 > Not All Layers Are Equal: A Layer-Wise Adaptive Approach toward Large-Scale DNN Training<br>
 > Yunyong Ko, Dongwon Lee, and Sang-Wook Kim<br>
@@ -30,3 +29,21 @@ Run by:
 > learning_rate: base learning rate <br>
 > warmup: the type of a warmup method (0: no warmup, 1: fixed warmup, 2: layer-wise train-aware warmup) <br>
 > warmup_ratio: the percentage of the training for warmup period <br>
+
+
+## Dependencies
+This repository provides an implementation of *LENA* as described in the following paper:
+
+
+## Citation
+Please cite our paper if you have used the code in your work. You can use the following BibTex citation:
+```
+
+@inproceedings{ko2022not,
+  title={Not All Layers Are Equal: A Layer-Wise Adaptive Approach Toward Large-Scale DNN Training},
+  author={Ko, Yunyong and Lee, Dongwon and Kim, Sang-Wook},
+  booktitle={Proceedings of the ACM Web Conference (WWW) 2022},
+  pages={1851--1859},
+  year={2022}
+}
+```
