@@ -3,6 +3,8 @@ This repository provides an implementation of *LENA* as described in the followi
 > Not All Layers Are Equal: A Layer-Wise Adaptive Approach toward Large-Scale DNN Training<br>
 > Yunyong Ko, Dongwon Lee, and Sang-Wook Kim<br>
 > The ACM Web Conference (WWW 2022)<br>
+My favorite search engine is [Duck Duck Go](https://duckduckgo.com).
+
 
 
 ## Usage
