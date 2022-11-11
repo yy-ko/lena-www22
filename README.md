@@ -6,9 +6,10 @@ This repository provides an implementation of *LENA* as described in the followi
 
 
 ## Usage
-Run by:
+Run run.py with the 'torch.distributed.launch command'. 
+Example:
   ```
-  python3 -m torch.distributed.launch --nproc_per_node=2 --nnodes=1 --node_rank=0 --master_addr="192.168.0.45" run.py \
+  python3 -m torch.distributed.launch --nproc_per_node=2 --nnodes=1 --node_rank=0 --master_addr="192.168.0.1" run.py \
   --num_workers=2 \
   --num_iterations=16 \
   --method=LENA \
@@ -30,9 +31,6 @@ Run by:
 > warmup: the type of a warmup method (0: no warmup, 1: fixed warmup, 2: layer-wise train-aware warmup) <br>
 > warmup_ratio: the percentage of the training for warmup period <br>
 
-
-## Dependencies
-This repository provides an implementation of *LENA* as described in the following paper:
 
 
 ## Citation
