@@ -1,4 +1,4 @@
-# Not All Layers Are Equal: A Layer-Wise Adaptive Approach toward Large-Scale DNN Training
+# [WWW'22] Not All Layers Are Equal: A Layer-Wise Adaptive Approach toward Large-Scale DNN Training
 This repository provides an implementation of *LENA* as described in the following paper: [Paper Link](https://yy-ko.github.io/assets/files/WWW22-lena-paper.pdf)
 > Yunyong Ko, Dongwon Lee, and Sang-Wook Kim, "Not All Layers Are Equal: A Layer-Wise Adaptive Approach toward Large-Scale DNN Training", In Proceedings of the ACM Web Conference (WWW) 2022<br>
 
